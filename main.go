@@ -19,10 +19,7 @@ func main() {
 	bash.Stderr = os.Stderr
 	bash.Stdin = os.Stdin
 
-	err := bash.Run()
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
+	bash.Run()
 }
 
 func createTunnel() *os.Process {
