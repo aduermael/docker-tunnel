@@ -5,6 +5,7 @@ Connect your local Docker client to remote a Docker engine through SSH tunnel.
 ### Requirements:
 
 - Make sure you can connect to your remote Docker host using public key authentication
+- OpenSSH 6.7 minimum on both sides (use `ssh -V` to check)
 
 
 ### How to install:
