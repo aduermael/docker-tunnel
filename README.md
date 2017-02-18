@@ -1,11 +1,11 @@
 # docker-tunnel
 
-Connect your local Docker client to remote a Docker engine through SSH tunnel.
+Connect your local Docker client to a remote Docker engine using an SSH tunnel.
 
 ### Requirements:
 
-- Make sure you can connect to your remote Docker host using public key authentication
-- OpenSSH 6.7 minimum on both sides (use `ssh -V` to check)
+- Make sure you can connect to your remote Docker host using SSH public key authentication
+- OpenSSH 6.7 minimum required on both sides (use `ssh -V` to check)
 
 
 ### How to install:
@@ -17,18 +17,16 @@ go install github.com/aduermael/docker-tunnel
 ### Usage:
 
 ```shell
-docker-tunnel [user] host
-```
-
-`user` is optional, "root" by defaut.
-
-
-```shell
-🐳  $ docker -v
-Docker version 1.12.0, build 8eab29e
+# `user` is optional, "root" by defaut.
+$ docker-tunnel [user] host
 ```
 
 That's it! Your local Docker client is now connected to your remote Docker engine using an SSH tunnel (only in that particular bash session).
+
+```shell
+🐳  $ docker version -f "{{.Server.KernelVersion}}"
+4.4.0-42-generic
+```
 
 ### Exit:
 
