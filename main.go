@@ -1,20 +1,23 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 func main() {
-	os.Setenv("PS1", "🐳  $ ")
-	os.Setenv("DOCKER_HOST", "unix:///tmp/docker.sock")
-
-	tunnelProcess := createTunnel()
+	tunnelProcess, socketPath := createTunnel()
 	defer tunnelProcess.Kill()
+	defer os.RemoveAll(socketPath)
+
+	os.Setenv("PS1", "🐳  $ ")
+	os.Setenv("DOCKER_HOST", "unix://"+socketPath)
 
 	bash := exec.Command("bash")
-
 	bash.Stdout = os.Stdout
 	bash.Stderr = os.Stderr
 	bash.Stdin = os.Stdin
@@ -22,13 +25,11 @@ func main() {
 	bash.Run()
 }
 
-func createTunnel() *os.Process {
+func createTunnel() (process *os.Process, socketPath string) {
+	socketPath = tmpSocketPath()
 
 	user := ""
 	host := ""
-
-	os.RemoveAll("/tmp/docker.sock")
-
 	if len(os.Args) == 2 {
 		host = os.Args[1]
 		user = "root"
@@ -37,14 +38,20 @@ func createTunnel() *os.Process {
 		host = os.Args[2]
 	} else {
 		log.Fatalln("usage: docker-tunnel [user] host")
-		return nil
 	}
 
-	cmd := exec.Command("ssh", "-nNT", "-L", "/tmp/docker.sock:/var/run/docker.sock", user+"@"+host)
+	cmd := exec.Command("ssh", "-nNT", "-L", socketPath+":/var/run/docker.sock", user+"@"+host)
 	err := cmd.Start()
 	if err != nil {
 		log.Fatalln("ERROR:", err.Error())
 	}
 
-	return cmd.Process
+	process = cmd.Process
+	return
+}
+
+func tmpSocketPath() string {
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+	return filepath.Join(os.TempDir(), "docker-"+hex.EncodeToString(randBytes)+".sock")
 }
