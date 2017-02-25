@@ -40,7 +40,11 @@ func createTunnel() (process *os.Process, socketPath string) {
 		log.Fatalln("usage: docker-tunnel [user] host")
 	}
 
-	cmd := exec.Command("ssh", "-nNT", "-L", socketPath+":/var/run/docker.sock", user+"@"+host)
+	cmd := exec.Command("ssh", "-nNT",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "StrictHostKeyChecking=no",
+		"-L", socketPath+":/var/run/docker.sock", user+"@"+host)
+
 	err := cmd.Start()
 	if err != nil {
 		log.Fatalln("ERROR:", err.Error())
