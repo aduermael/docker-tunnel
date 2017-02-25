@@ -1,35 +1,65 @@
 # docker-tunnel
 
-Connect your local Docker client to a remote Docker engine using an SSH tunnel.
+Connect to a remote Docker host using an SSH tunnel.
 
 ### Requirements:
 
 - Make sure you can connect to your remote Docker host using SSH public key authentication
-- OpenSSH 6.7 minimum required on both sides (use `ssh -V` to check)
-
+- OpenSSH 6.7 minimum required at least on the server side. (client side as well if you don't use docker-tunnel in a container)
 
 ### How to install:
 
-```shell
-go install github.com/aduermael/docker-tunnel
-```
+- **docker-tunnel** can be installed directly on your host like this ([Go](https://golang.org/doc/install) has to be installed):
+
+	```bash
+	$ go install github.com/aduermael/docker-tunnel
+	```
+- You can also get the Docker image:
+	
+	```bash
+	$ docker pull aduermael/docker-tunnel
+	```
 
 ### Usage:
 
-```shell
-# `user` is optional, "root" by defaut.
-$ docker-tunnel [user] host
+**docker-tunnel** has a small command line interface:
+
+```bash
+# type this if you installed directly on your host:
+$ docker-tunnel
+# or this if using the Docker image:
+$ docker run --rm aduermael/docker-tunnel
+
+# in both cases, you'll see something like this:
+Usage:
+  docker-tunnel [user@]host [flags]
+
+Flags:
+  -p, --proxy          proxy mode (don't start shell session)
+  -s, --shell string   shell to open session (default "bash")
+  -i, --sshid string   path to private key
+
 ```
 
-That's it! Your local Docker client is now connected to your remote Docker engine using an SSH tunnel (only in that particular bash session).
+**docker-tunnel** can be used in 2 different modes:
 
-```shell
-🐳  $ docker version -f "{{.Server.KernelVersion}}"
-4.4.0-42-generic
+- **shell mode** (default): opens a shell session, bash by default but a different one can be requested using `-s` flag. From within this shell, all Docker commands are sent to the remote Docker host through an established SSH tunnel.
+
+- **proxy mode** (using `-p` flag): exposes a Docker remote API on port 2375, proxying all requests over SSH to the remote Docker host.
+
+In both modes, the `-i` flag can be used to give the location of your ssh identity file (private key). 
+
+### Examples
+
+Run container acting as a Docker remote API proxy to reach remote Docker host.
+
+```bash
+$ docker run --rm -v ~/.ssh/id_rsa:/ssh_id -p 127.0.0.1:2375:2375 \
+aduermael/docker-tunnel 138.88.888.888 -i /ssh_id -p
 ```
 
-### Exit:
+Open a bash session to run containers on a remote Docker host, using files from your local environment:
 
-```shell
-🐳  $ exit
+```bash
+$ docker-tunnel 138.88.888.888
 ```
