@@ -7,47 +7,81 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	// path to private key or empty to use default
+	sshIdentityFile = ""
+	shell           = "bash"
 )
 
 func main() {
-	tunnelProcess, socketPath := createTunnel()
-	defer tunnelProcess.Kill()
-	defer os.RemoveAll(socketPath)
+	rootCmd := &cobra.Command{
+		Use:   "docker-tunnel [user@]host",
+		Short: "Docker-tunnel connects you to remote Docker hosts using SSH tunnels",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) != 1 {
+				cmd.Usage()
+				return
+			}
 
-	os.Setenv("PS1", "🐳  $ ")
-	os.Setenv("DOCKER_HOST", "unix://"+socketPath)
+			userAtHost := args[0]
+			// root user by default
+			if !strings.Contains(userAtHost, "@") {
+				userAtHost = "root@" + userAtHost
+			}
 
-	bash := exec.Command("bash")
-	bash.Stdout = os.Stdout
-	bash.Stderr = os.Stderr
-	bash.Stdin = os.Stdin
+			tunnelProcess, socketPath := createTunnel(userAtHost)
+			defer tunnelProcess.Kill()
+			defer os.RemoveAll(socketPath)
 
-	bash.Run()
-}
+			os.Setenv("PS1", "🐳  $ ")
+			os.Setenv("DOCKER_HOST", "unix://"+socketPath)
 
-func createTunnel() (process *os.Process, socketPath string) {
-	socketPath = tmpSocketPath()
+			sh := exec.Command(shell)
+			sh.Stdout = os.Stdout
+			sh.Stderr = os.Stderr
+			sh.Stdin = os.Stdin
 
-	user := ""
-	host := ""
-	if len(os.Args) == 2 {
-		host = os.Args[1]
-		user = "root"
-	} else if len(os.Args) == 3 {
-		user = os.Args[1]
-		host = os.Args[2]
-	} else {
-		log.Fatalln("usage: docker-tunnel [user] host")
+			err := sh.Run()
+			if err != nil {
+				log.Fatalln(err.Error())
+			}
+		},
 	}
 
-	cmd := exec.Command("ssh", "-nNT",
+	rootCmd.Flags().StringVarP(&sshIdentityFile, "sshid", "i", "", "path to private key")
+	rootCmd.Flags().StringVarP(&shell, "shell", "s", "bash", "shell to open session")
+
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatalln(err.Error())
+	}
+}
+
+func createTunnel(userAtHost string) (process *os.Process, socketPath string) {
+	socketPath = tmpSocketPath()
+
+	args := []string{
+		"-nNT",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "StrictHostKeyChecking=no",
-		"-L", socketPath+":/var/run/docker.sock", user+"@"+host)
+		"-L", socketPath + ":/var/run/docker.sock",
+	}
 
+	// check if custom ssh id path should be used
+	if sshIdentityFile != "" {
+		args = append(args, "-i", sshIdentityFile)
+	}
+
+	args = append(args, userAtHost)
+
+	cmd := exec.Command("ssh", args...)
 	err := cmd.Start()
 	if err != nil {
-		log.Fatalln("ERROR:", err.Error())
+		log.Fatalln(err.Error())
 	}
 
 	process = cmd.Process
