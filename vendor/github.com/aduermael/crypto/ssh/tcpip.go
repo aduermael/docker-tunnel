@@ -293,23 +293,33 @@ func (l *tcpListener) Addr() net.Addr {
 // Dial initiates a connection to the addr from the remote host.
 // The resulting connection has a zero LocalAddr() and RemoteAddr().
 func (c *Client) Dial(n, addr string) (net.Conn, error) {
-	// Parse the address into host and numeric port.
-	host, portString, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	port, err := strconv.ParseUint(portString, 10, 16)
-	if err != nil {
-		return nil, err
+	var ch Channel
+	var err error
+
+	if n == "unix" {
+		ch, err = c.dialUnixSocket(addr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Parse the address into host and numeric port.
+		host, portString, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		port, err := strconv.ParseUint(portString, 10, 16)
+		if err != nil {
+			return nil, err
+		}
+		ch, err = c.dial(net.IPv4zero.String(), 0, host, int(port))
+		if err != nil {
+			return nil, err
+		}
 	}
 	// Use a zero address for local and remote address.
 	zeroAddr := &net.TCPAddr{
 		IP:   net.IPv4zero,
 		Port: 0,
-	}
-	ch, err := c.dial(net.IPv4zero.String(), 0, host, int(port))
-	if err != nil {
-		return nil, err
 	}
 	return &tcpChanConn{
 		Channel: ch,
@@ -355,6 +365,26 @@ func (c *Client) dial(laddr string, lport int, raddr string, rport int) (Channel
 		lport: uint32(lport),
 	}
 	ch, in, err := c.OpenChannel("direct-tcpip", Marshal(&msg))
+	if err != nil {
+		return nil, err
+	}
+	go DiscardRequests(in)
+	return ch, err
+}
+
+type channelOpenDirectStreamLocalAtOpenSSh struct {
+	socketPath     string
+	reservedString string
+	reservedInt    uint32
+}
+
+func (c *Client) dialUnixSocket(socketPath string) (Channel, error) {
+	msg := channelOpenDirectStreamLocalAtOpenSSh{
+		socketPath:     socketPath,
+		reservedString: "",
+		reservedInt:    0,
+	}
+	ch, in, err := c.OpenChannel("direct-streamlocal@openssh.com", Marshal(&msg))
 	if err != nil {
 		return nil, err
 	}
