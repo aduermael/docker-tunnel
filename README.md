@@ -5,7 +5,7 @@ Connect to a remote Docker host using an SSH tunnel.
 ### Requirements:
 
 - Make sure you can connect to your remote Docker host using SSH public key authentication
-- OpenSSH 6.7 minimum required at least on the server side. (client side as well if you don't use docker-tunnel in a container)
+- OpenSSH 6.7 minimum required at least on the server side.
 
 ### How to install:
 
@@ -56,10 +56,14 @@ Run container acting as a Docker remote API proxy to reach remote Docker host.
 ```bash
 $ docker run --rm -v ~/.ssh/id_rsa:/ssh_id -p 127.0.0.1:2375:2375 \
 aduermael/docker-tunnel 138.88.888.888 -i /ssh_id -p
+
+# now in a different shell session you can do:
+export DOCKER_HOST=tcp://127.0.0.1:2375
+# all docker commands will now target the remote side (through the proxy)
 ```
 
 Open a bash session to run containers on a remote Docker host, using files from your local environment:
 
 ```bash
-$ docker-tunnel 138.88.888.888
+$ docker-tunnel user@138.88.888.888
 ```
