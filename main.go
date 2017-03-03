@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/aduermael/crypto/ssh"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +27,8 @@ var (
 	shell = "bash"
 	// proxy mode (don't start shell session)
 	proxyMode = false
+	// verbose mode (debug logs)
+	verbose = false
 )
 
 func main() {
@@ -35,6 +37,10 @@ func main() {
 		Use:   "docker-tunnel [user@]host",
 		Short: "Docker-tunnel connects you to remote Docker hosts using SSH tunnels",
 		Run: func(cmd *cobra.Command, args []string) {
+			if verbose {
+				log.SetLevel(log.DebugLevel)
+			}
+
 			if len(args) != 1 {
 				cmd.Usage()
 				return
@@ -47,6 +53,8 @@ func main() {
 			defer sshClient.Close()
 
 			if proxyMode {
+				log.Debugln("proxy mode")
+
 				ln, err := net.Listen("tcp", ":2375")
 				if err != nil {
 					log.Fatalln(err)
@@ -64,8 +72,10 @@ func main() {
 
 			// proxyMode == false
 			// open shell session, connected to remote Docker host
+			log.Debugln("shell mode")
 
 			socketPath := tmpSocketPath()
+			log.Debugln("socket path:", socketPath)
 
 			ln, err := net.Listen("unix", socketPath)
 			if err != nil {
@@ -80,6 +90,7 @@ func main() {
 					if err != nil {
 						log.Fatalln(err)
 					}
+					log.Debugln("handle socket connection")
 					go handleProxyConnection(conn, sshClient)
 				}
 			}()
@@ -102,6 +113,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&sshIdentityFile, "sshid", "i", "", "path to private key")
 	rootCmd.Flags().StringVarP(&shell, "shell", "s", "bash", "shell to open session")
 	rootCmd.Flags().BoolVarP(&proxyMode, "proxy", "p", false, "proxy mode (don't start shell session)")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose mode (debug logs)")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalln(err.Error())
@@ -126,9 +138,11 @@ func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
 		host = userAndHost[1]
 	}
 
+	log.Debugln("user:", user)
+
 	u, err := url.Parse(host)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("ssh connection can't be established: %s", err))
+		return nil, fmt.Errorf("ssh connection can't be established: %s", err)
 	}
 	if u.Scheme == "" {
 		u.Scheme = "tcp"
@@ -152,10 +166,15 @@ func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
 		addr += ":22"
 	}
 
+	log.Debugln("address:", u.Scheme+"://"+addr)
+
 	sshClientConn, err := ssh.Dial(u.Scheme, addr, config)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("ssh connection can't be established: %s", err))
+		return nil, fmt.Errorf("ssh connection can't be established: %s", err)
 	}
+
+	log.Debugln("ssh connection established")
+
 	return sshClientConn, nil
 }
 
