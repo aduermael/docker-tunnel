@@ -108,60 +108,11 @@ func main() {
 	}
 }
 
-func createTunnel(userAtHost string) (process *os.Process, socketPath string) {
-	socketPath = tmpSocketPath()
-
-	args := []string{
-		"-nNT",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-o", "StrictHostKeyChecking=no",
-		"-L", socketPath + ":/var/run/docker.sock",
-	}
-
-	// check if custom ssh id path should be used
-	if sshIdentityFile != "" {
-		args = append(args, "-i", sshIdentityFile)
-	}
-
-	args = append(args, userAtHost)
-
-	cmd := exec.Command("ssh", args...)
-	err := cmd.Start()
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-
-	// TODO: it fails sometimes...
-	// Maybe we could wait for socket to be created
-	// and eventually retry
-
-	process = cmd.Process
-	return
-}
-
 func tmpSocketPath() string {
 	randBytes := make([]byte, 16)
 	rand.Read(randBytes)
 	return filepath.Join(os.TempDir(), "docker-"+hex.EncodeToString(randBytes)+".sock")
 }
-
-// func proxy(socketPath string) *httputil.ReverseProxy {
-// 	u, err := url.Parse("http://unix.sock")
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	proxy := httputil.NewSingleHostReverseProxy(u)
-
-// 	tr := &http.Transport{
-// 		Dial: func(proto, addr string) (conn net.Conn, err error) {
-// 			return net.Dial("unix", socketPath)
-// 		},
-// 	}
-// 	proxy.Transport = tr
-
-// 	return proxy
-// }
 
 func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
 	// root user by default
