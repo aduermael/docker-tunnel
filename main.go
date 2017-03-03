@@ -128,7 +128,7 @@ func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
 
 	u, err := url.Parse(host)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("ssh connection can't be established: %s", err))
+		return nil, fmt.Errorf("ssh connection can't be established: %s", err)
 	}
 	if u.Scheme == "" {
 		u.Scheme = "tcp"
@@ -154,7 +154,7 @@ func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
 
 	sshClientConn, err := ssh.Dial(u.Scheme, addr, config)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("ssh connection can't be established: %s", err))
+		return nil, fmt.Errorf("ssh connection can't be established: %s", err)
 	}
 	return sshClientConn, nil
 }
@@ -184,14 +184,14 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 	// remote addr
 	u, err := url.Parse(remoteAddr)
 	if err != nil {
-		return errors.New(fmt.Sprintf("can't parse remote address: %s\n", remoteAddr))
+		return fmt.Errorf("can't parse remote address: %s", remoteAddr)
 	}
 
 	addr := filepath.Join(u.Host, u.Path)
 
 	sshConn, err := sshClient.Dial(u.Scheme, addr)
 	if err != nil {
-		return errors.New(fmt.Sprintf("can't connect to %s (from remote)", remoteAddr))
+		return fmt.Errorf("can't connect to %s (from remote)", remoteAddr)
 	}
 
 	// Copy conn.Reader to sshConn.Writer
