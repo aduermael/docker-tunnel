@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/aduermael/crypto/ssh"
+	"github.com/howeyc/gopass"
 )
 
 const (
@@ -41,7 +42,17 @@ func authMethodPublicKeys(privateKeyPath, password string) (ssh.AuthMethod, erro
 			// private key is encrypted, try to decrypt it
 			key, err = decryptPrivateKey(pemBytes, []byte(keyPassword))
 			if err != nil {
-				return nil, err
+				// prompt user for ssh key password
+				fmt.Printf("Enter password for private key (%s): ", privateKeyPath)
+				var passwordInput []byte
+				passwordInput, err = gopass.GetPasswd()
+				if err != nil {
+					return nil, err
+				}
+				key, err = decryptPrivateKey(pemBytes, passwordInput)
+				if err != nil {
+					return nil, err
+				}
 			}
 		} else {
 			return nil, err
