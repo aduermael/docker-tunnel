@@ -203,14 +203,14 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 	// remote addr
 	u, err := url.Parse(remoteAddr)
 	if err != nil {
-		return errors.New(fmt.Sprintf("can't parse remote address: %s\n", remoteAddr))
+		return fmt.Errorf("can't parse remote address: %s", remoteAddr)
 	}
 
 	addr := filepath.Join(u.Host, u.Path)
 
 	sshConn, err := sshClient.Dial(u.Scheme, addr)
 	if err != nil {
-		return errors.New(fmt.Sprintf("can't connect to %s (from remote)", remoteAddr))
+		return fmt.Errorf("can't connect to %s (from remote)", remoteAddr)
 	}
 
 	// Copy conn.Reader to sshConn.Writer
