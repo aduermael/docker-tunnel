@@ -27,8 +27,6 @@ var (
 	shell = "bash"
 	// proxy mode (don't start shell session)
 	proxyMode = false
-	// password to use to decrypt an encrypted SSH private key
-	keyPassword = ""
 )
 
 func main() {
@@ -42,7 +40,7 @@ func main() {
 				return
 			}
 
-			sshClient, err := sshConnect(args[0], sshIdentityFile, keyPassword)
+			sshClient, err := sshConnect(args[0], sshIdentityFile)
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -104,7 +102,6 @@ func main() {
 	rootCmd.Flags().StringVarP(&sshIdentityFile, "sshid", "i", "", "path to private key")
 	rootCmd.Flags().StringVarP(&shell, "shell", "s", "bash", "shell to open session")
 	rootCmd.Flags().BoolVarP(&proxyMode, "proxy", "p", false, "proxy mode (don't start shell session)")
-	rootCmd.Flags().StringVarP(&keyPassword, "keypass", "k", "", "password for encrypted private key")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalln(err.Error())
@@ -117,7 +114,7 @@ func tmpSocketPath() string {
 	return filepath.Join(os.TempDir(), "docker-"+hex.EncodeToString(randBytes)+".sock")
 }
 
-func sshConnect(userAtHost, privateKeyPath, privateKeyPassword string) (*ssh.Client, error) {
+func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 	// root user by default
 	user := "root"
 	host := ""
@@ -137,7 +134,7 @@ func sshConnect(userAtHost, privateKeyPath, privateKeyPassword string) (*ssh.Cli
 		u.Scheme = "tcp"
 	}
 
-	authMethod, err := authMethodPublicKeys(privateKeyPath, privateKeyPassword)
+	authMethod, err := authMethodPublicKeys(privateKeyPath)
 	if err != nil {
 		log.Fatalln(err)
 	}

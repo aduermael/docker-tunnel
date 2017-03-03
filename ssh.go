@@ -21,7 +21,7 @@ const (
 // authMethodPublicKeys returns an ssh.PublicKeys authentication
 // method using private key path.
 // If privateKeyPath is empty, default location used: ~/.ssh/id_rsa
-func authMethodPublicKeys(privateKeyPath, password string) (ssh.AuthMethod, error) {
+func authMethodPublicKeys(privateKeyPath string) (ssh.AuthMethod, error) {
 
 	if privateKeyPath == "" {
 		usr, err := user.Current()
@@ -40,19 +40,16 @@ func authMethodPublicKeys(privateKeyPath, password string) (ssh.AuthMethod, erro
 	if err != nil {
 		if err.Error() == errCannotDecodeEncryptedPrivateKeys {
 			// private key is encrypted, try to decrypt it
-			key, err = decryptPrivateKey(pemBytes, []byte(keyPassword))
+			// prompt user for ssh key password
+			fmt.Printf("Enter password for private key (%s): ", privateKeyPath)
+			var passwordInput []byte
+			passwordInput, err = gopass.GetPasswd()
 			if err != nil {
-				// prompt user for ssh key password
-				fmt.Printf("Enter password for private key (%s): ", privateKeyPath)
-				var passwordInput []byte
-				passwordInput, err = gopass.GetPasswd()
-				if err != nil {
-					return nil, err
-				}
-				key, err = decryptPrivateKey(pemBytes, passwordInput)
-				if err != nil {
-					return nil, err
-				}
+				return nil, err
+			}
+			key, err = decryptPrivateKey(pemBytes, passwordInput)
+			if err != nil {
+				return nil, err
 			}
 		} else {
 			return nil, err
