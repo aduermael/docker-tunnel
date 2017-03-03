@@ -126,7 +126,7 @@ func tmpSocketPath() string {
 	return filepath.Join(os.TempDir(), "docker-"+hex.EncodeToString(randBytes)+".sock")
 }
 
-func sshConnect(userAtHost string, privateKeyPath string) (*ssh.Client, error) {
+func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 	// root user by default
 	user := "root"
 	host := ""
