@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/aduermael/crypto/ssh"
@@ -67,7 +69,6 @@ func main() {
 					}
 					go handleProxyConnection(conn, sshClient)
 				}
-				return
 			}
 
 			// proxyMode == false
@@ -213,25 +214,50 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 		return fmt.Errorf("can't connect to %s (from remote)", remoteAddr)
 	}
 
+	chan1 := make(chan struct{})
+	chan2 := make(chan struct{})
+	chan3 := make(chan struct{})
+	var o sync.Once
+	closeChan2 := func() {
+		close(chan2)
+	}
+
 	// Copy conn.Reader to sshConn.Writer
 	go func() {
-		_, err = io.Copy(sshConn, conn)
+		_, err := io.Copy(sshConn, conn)
 		if err != nil {
-			if err != io.EOF {
-				log.Fatalln(err)
+			log.Fatalln(err)
+		}
+		close(chan1)
+
+		for {
+			_, err := conn.Write(make([]byte, 0))
+			if err != nil {
+				o.Do(closeChan2)
+				break
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 
 	// Copy sshConn.Reader to localConn.Writer
 	go func() {
-		_, err = io.Copy(conn, sshConn)
+		_, err := io.Copy(conn, sshConn)
 		if err != nil {
-			if err != io.EOF {
-				log.Fatalln(err)
-			}
+			log.Fatalln(err)
 		}
+		o.Do(closeChan2)
+		close(chan3)
 	}()
+
+	<-chan1
+	<-chan2
+	conn.Close()
+	sshConn.Close()
+
+	<-chan3
+
+	log.Debugln("closed socket connection")
 
 	return nil
 }
