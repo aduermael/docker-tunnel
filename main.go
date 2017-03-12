@@ -104,10 +104,7 @@ func main() {
 			sh.Stderr = os.Stderr
 			sh.Stdin = os.Stdin
 
-			err = sh.Run()
-			if err != nil {
-				log.Fatalln(err.Error())
-			}
+			_ = sh.Run()
 		},
 	}
 
