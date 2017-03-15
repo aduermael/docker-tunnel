@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aduermael/crypto/ssh"
 	"github.com/spf13/cobra"
 )
@@ -37,10 +36,10 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:   "docker-tunnel [user@]host",
-		Short: "Docker-tunnel connects you to remote Docker hosts using SSH tunnels",
+		Short: "Docker-tunnel connects you to a remote Docker host through an SSH tunnel",
 		Run: func(cmd *cobra.Command, args []string) {
 			if verbose {
-				log.SetLevel(log.DebugLevel)
+				logLevel = logLevelDebug
 			}
 
 			if len(args) != 1 {
@@ -50,22 +49,22 @@ func main() {
 
 			sshClient, err := sshConnect(args[0], sshIdentityFile)
 			if err != nil {
-				log.Fatalln(err)
+				printFatal(err)
 			}
 			defer sshClient.Close()
 
 			if proxyMode {
-				log.Debugln("proxy mode")
+				printDebug("proxy mode")
 
 				ln, err := net.Listen("tcp", ":2375")
 				if err != nil {
-					log.Fatalln(err)
+					printFatal(err)
 				}
-				fmt.Println("listening on port 2375...")
+				print("listening on port 2375...")
 				for {
 					conn, err := ln.Accept()
 					if err != nil {
-						log.Fatalln(err)
+						printFatal(err)
 					}
 					go handleProxyConnection(conn, sshClient)
 				}
@@ -73,14 +72,14 @@ func main() {
 
 			// proxyMode == false
 			// open shell session, connected to remote Docker host
-			log.Debugln("shell mode")
+			printDebug("shell mode")
 
 			socketPath := tmpSocketPath()
-			log.Debugln("socket path:", socketPath)
+			printDebug("socket path:", socketPath)
 
 			ln, err := net.Listen("unix", socketPath)
 			if err != nil {
-				log.Fatalln(err)
+				printFatal(err)
 			}
 			defer os.RemoveAll(socketPath)
 
@@ -89,9 +88,9 @@ func main() {
 				for {
 					conn, err := ln.Accept()
 					if err != nil {
-						log.Fatalln(err)
+						printFatal(err)
 					}
-					log.Debugln("handle socket connection")
+					printDebug("handle socket connection")
 					go handleProxyConnection(conn, sshClient)
 				}
 			}()
@@ -114,7 +113,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose mode (debug logs)")
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalln(err.Error())
+		printFatal(err.Error())
 	}
 }
 
@@ -136,7 +135,7 @@ func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 		host = userAndHost[1]
 	}
 
-	log.Debugln("user:", user)
+	printDebug("user:", user)
 
 	u, err := url.Parse(host)
 	if err != nil {
@@ -148,7 +147,7 @@ func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 
 	authMethod, err := authMethodPublicKeys(privateKeyPath)
 	if err != nil {
-		log.Fatalln(err)
+		printFatal(err)
 	}
 	config := &ssh.ClientConfig{
 		User: user,
@@ -164,14 +163,14 @@ func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 		addr += ":22"
 	}
 
-	log.Debugln("address:", u.Scheme+"://"+addr)
+	printDebug("address:", u.Scheme+"://"+addr)
 
 	sshClientConn, err := ssh.Dial(u.Scheme, addr, config)
 	if err != nil {
 		return nil, fmt.Errorf("ssh connection can't be established: %s", err)
 	}
 
-	log.Debugln("ssh connection established")
+	printDebug("ssh connection established")
 
 	return sshClientConn, nil
 }
@@ -179,7 +178,7 @@ func sshConnect(userAtHost, privateKeyPath string) (*ssh.Client, error) {
 func handleProxyConnection(conn net.Conn, sshClient *ssh.Client) {
 	err := forward(conn, sshClient, "unix:///var/run/docker.sock")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "can't forward connection: %s\n", err.Error())
+		printError(os.Stderr, "can't forward connection:", err.Error())
 	}
 }
 
@@ -221,23 +220,23 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 
 	// Copy conn.Reader to sshConn.Writer
 	go func() {
-		log.Debugln("copy: read from client conn, write to server conn")
+		printDebug("copy: read from client conn, write to server conn")
 		_, err := io.Copy(sshConn, conn)
 		if err != nil {
-			log.Fatalln(err)
+			printFatal(err)
 		}
 		close(chan1)
 
 		if c, ok := sshConn.(ssh.Channel); ok {
 			_ = c.CloseWrite()
-			log.Debugln("closed sshConn writer")
+			printDebug("closed sshConn writer")
 		}
 
 		for {
-			log.Debugln("can't read from client anymore, trying to write...")
+			printDebug("can't read from client anymore, trying to write...")
 			_, err := conn.Write(make([]byte, 0))
 			if err != nil {
-				log.Debugln("can't write, closing both conns")
+				printDebug("can't write, closing both conns")
 				o.Do(closeChan2)
 				break
 			}
@@ -247,21 +246,21 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 
 	// Copy sshConn.Reader to localConn.Writer
 	go func() {
-		log.Debugln("copy: read from server conn, write to client conn")
+		printDebug("copy: read from server conn, write to client conn")
 		_, err := io.Copy(conn, sshConn)
 		if err != nil {
-			log.Fatalln(err)
+			printFatal(err)
 		}
-		log.Debugln("can't read from server anymore...")
+		printDebug("can't read from server anymore...")
 
 		if tcpConn, ok := conn.(*net.TCPConn); ok {
 			_ = tcpConn.CloseWrite()
-			log.Debugln("closed TCPconn writer")
+			printDebug("closed TCPconn writer")
 		} else if unixConn, ok := conn.(*net.UnixConn); ok {
 			_ = unixConn.CloseWrite()
-			log.Debugln("closed unixConn writer")
+			printDebug("closed unixConn writer")
 		} else {
-			log.Debugln("can't close conn writer")
+			printDebug("can't close conn writer")
 		}
 
 		o.Do(closeChan2)
@@ -275,7 +274,7 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 
 	<-chan3
 
-	log.Debugln("closed socket connection")
+	printDebug("closed socket connection")
 
 	return nil
 }
