@@ -228,15 +228,19 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 		close(chan1)
 
 		if c, ok := sshConn.(ssh.Channel); ok {
-			_ = c.CloseWrite()
-			printDebug("closed sshConn writer")
+			if err := c.CloseWrite(); err != nil {
+				printError("can't close sshConn writer")
+			} else {
+				printDebug("closed sshConn writer")
+			}
+
 		}
 
 		for {
 			printDebug("can't read from client anymore, trying to write...")
 			_, err := conn.Write(make([]byte, 0))
 			if err != nil {
-				printDebug("can't write, closing both conns")
+				printDebug("can't write, closing both connections")
 				o.Do(closeChan2)
 				break
 			}
@@ -251,18 +255,21 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 		if err != nil {
 			printFatal(err)
 		}
-		printDebug("can't read from server anymore...")
-
 		if tcpConn, ok := conn.(*net.TCPConn); ok {
-			_ = tcpConn.CloseWrite()
-			printDebug("closed TCPconn writer")
+			if err := tcpConn.CloseWrite(); err != nil {
+				printError("can't close TCPconn writer")
+			} else {
+				printDebug("closed TCPconn writer")
+			}
 		} else if unixConn, ok := conn.(*net.UnixConn); ok {
-			_ = unixConn.CloseWrite()
-			printDebug("closed unixConn writer")
+			if err := unixConn.CloseWrite(); err != nil {
+				printError("can't close UnixConn writer")
+			} else {
+				printDebug("closed UnixConn writer")
+			}
 		} else {
 			printDebug("can't close conn writer")
 		}
-
 		o.Do(closeChan2)
 		close(chan3)
 	}()
