@@ -221,15 +221,23 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 
 	// Copy conn.Reader to sshConn.Writer
 	go func() {
+		log.Debugln("copy: read from client conn, write to server conn")
 		_, err := io.Copy(sshConn, conn)
 		if err != nil {
 			log.Fatalln(err)
 		}
 		close(chan1)
 
+		if c, ok := sshConn.(ssh.Channel); ok {
+			_ = c.CloseWrite()
+			log.Debugln("closed sshConn writer")
+		}
+
 		for {
+			log.Debugln("can't read from client anymore, trying to write...")
 			_, err := conn.Write(make([]byte, 0))
 			if err != nil {
+				log.Debugln("can't write, closing both conns")
 				o.Do(closeChan2)
 				break
 			}
@@ -239,10 +247,23 @@ func forward(conn net.Conn, sshClient *ssh.Client, remoteAddr string) error {
 
 	// Copy sshConn.Reader to localConn.Writer
 	go func() {
+		log.Debugln("copy: read from server conn, write to client conn")
 		_, err := io.Copy(conn, sshConn)
 		if err != nil {
 			log.Fatalln(err)
 		}
+		log.Debugln("can't read from server anymore...")
+
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			_ = tcpConn.CloseWrite()
+			log.Debugln("closed TCPconn writer")
+		} else if unixConn, ok := conn.(*net.UnixConn); ok {
+			_ = unixConn.CloseWrite()
+			log.Debugln("closed unixConn writer")
+		} else {
+			log.Debugln("can't close conn writer")
+		}
+
 		o.Do(closeChan2)
 		close(chan3)
 	}()
