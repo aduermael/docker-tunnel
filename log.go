@@ -5,10 +5,8 @@ import (
 	"os"
 )
 
-type LogLevel int
-
 const (
-	logLevelDebug LogLevel = iota
+	logLevelDebug int = iota
 	logLevelError
 	logLevelInfo
 )
