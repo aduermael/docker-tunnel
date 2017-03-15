@@ -2,6 +2,8 @@
 
 Connect to a remote Docker host using an SSH tunnel.
 
+![](https://goreportcard.com/badge/github.com/aduermael/docker-tunnel)
+
 ### Requirements:
 
 - Make sure you can connect to your remote Docker host using SSH public key authentication
